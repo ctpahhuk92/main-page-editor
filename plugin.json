@@ -1,0 +1,10 @@
+{
+  "id": "main_page_editor",
+  "name": "Main Page Editor",
+  "description": "Управление разделами главной страницы",
+  "version": "1.0",
+  "icon": "fas fa-th-large",
+  "author": "Artur Ofitserov",
+  "compatibility": ["lampa"],
+  "main": "plugin.js"
+}

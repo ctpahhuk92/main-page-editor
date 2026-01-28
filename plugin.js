@@ -1,6 +1,6 @@
 class MainPageEditorPlugin {
     constructor() {
-        this.id = 'main_page_editor';
+        this.id = 'main-page-editor';
         this.name = 'Main Page Editor';
         this.version = '1.0';
         this.icon = 'fas fa-th-large';
@@ -13,7 +13,7 @@ class MainPageEditorPlugin {
     ready() {
         if (!window.Lampa || !window.Lampa.main) return;
 
-        const sections = window.Lampa.main.getSections(); // Берём разделы через API Lampa
+        const sections = window.Lampa.main.getSections();
 
         const storage = window.Lampa.storage || {};
         let savedOrder = storage.get('mainSectionsOrder') || sections.map(s => s.id);
@@ -83,7 +83,7 @@ class MainPageEditorPlugin {
     }
 
     applySettings(sections, order, hidden) {
-        sections.forEach((sect) => {
+        sections.forEach(sect => {
             try {
                 window.Lampa.main.setSectionHidden(sect.id, Boolean(hidden[sect.id]));
                 window.Lampa.main.setSectionOrder(sect.id, order.indexOf(sect.id));
@@ -94,4 +94,11 @@ class MainPageEditorPlugin {
     }
 }
 
-window.Lampa.plugins.register(new MainPageEditorPlugin());
+// Регистрация плагина только когда Lampa полностью загружена
+(function waitLampa(){
+    if(window.Lampa && window.Lampa.plugins){
+        window.Lampa.plugins.register(new MainPageEditorPlugin());
+    } else {
+        setTimeout(waitLampa, 100); // повтор через 100 мс
+    }
+})();

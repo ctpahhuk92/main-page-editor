@@ -2,103 +2,127 @@ class MainPageEditorPlugin {
     constructor() {
         this.id = 'main-page-editor';
         this.name = 'Main Page Editor';
-        this.version = '1.0';
+        this.version = '1.0.0';
         this.icon = 'fas fa-th-large';
     }
 
     init() {
-        console.log('[MainPageEditor] Инициализация плагина...');
+        console.log(`[${this.name}] Инициализация...`);
     }
 
     ready() {
-        if (!window.Lampa || !window.Lampa.main) return;
+        if (!window.Lampa || !window.Lampa.main || !window.Lampa.settings) return;
 
         const sections = window.Lampa.main.getSections();
+        const storage = window.Lampa.storage;
 
-        const storage = window.Lampa.storage || {};
-        let savedOrder = storage.get('mainSectionsOrder') || sections.map(s => s.id);
-        let savedHidden = storage.get('mainSectionsHidden') || {};
+        // Создаём раздел настроек, если его ещё нет
+        window.Lampa.settings.add({
+            id: 'main-page-editor',
+            title: 'Main Page Editor',
+            html: '<div id="mpe_container" style="padding:10px;color:#fff;"></div>'
+        });
 
-        const editorContainer = window.Lampa.settings.getContainer('Main Page Editor');
-        if (!editorContainer) return;
+        const container = document.getElementById('mpe_container');
+        if (!container) return;
 
-        const panel = document.createElement('div');
-        panel.style.padding = '10px';
-        panel.style.background = '#222';
-        panel.style.color = '#fff';
-        panel.style.borderRadius = '5px';
-        panel.style.marginBottom = '15px';
-        panel.innerHTML = '<h3>Main Page Editor</h3><div id="mpe_controls"></div>';
-        editorContainer.prepend(panel);
+        // Заголовок
+        const panelTitle = document.createElement('h3');
+        panelTitle.textContent = 'Main Page Editor';
+        container.appendChild(panelTitle);
 
-        const controls = panel.querySelector('#mpe_controls');
+        // Контейнер для контролов
+        const controls = document.createElement('div');
+        controls.id = 'mpe_controls';
+        container.appendChild(controls);
 
-        savedOrder.forEach(id => {
-            const section = sections.find(s => s.id === id);
-            if (!section) return;
+        // Загружаем сохранённые настройки
+        let order = storage.get('mainSectionsOrder') || sections.map(s => s.id);
+        let hidden = storage.get('mainSectionsHidden') || {};
 
-            const div = document.createElement('div');
-            div.style.marginBottom = '8px';
-
-            const checkbox = document.createElement('input');
-            checkbox.type = 'checkbox';
-            checkbox.checked = !savedHidden[id];
-            checkbox.addEventListener('change', () => {
-                savedHidden[id] = !checkbox.checked;
-                storage.set('mainSectionsHidden', savedHidden);
-                this.applySettings(sections, savedOrder, savedHidden);
+        // Функция для применения настроек
+        const applySettings = () => {
+            sections.forEach(sec => {
+                try {
+                    window.Lampa.main.setSectionHidden(sec.id, Boolean(hidden[sec.id]));
+                    window.Lampa.main.setSectionOrder(sec.id, order.indexOf(sec.id));
+                } catch(e) {
+                    console.warn('[MainPageEditor] Не удалось применить настройки для', sec.id);
+                }
             });
+        };
 
-            const up = document.createElement('button');
-            up.textContent = '↑';
-            up.onclick = () => {
-                const index = savedOrder.indexOf(id);
-                if (index > 0) {
-                    [savedOrder[index], savedOrder[index - 1]] = [savedOrder[index - 1], savedOrder[index]];
-                    storage.set('mainSectionsOrder', savedOrder);
-                    this.applySettings(sections, savedOrder, savedHidden);
-                }
-            };
+        // Функция для отрисовки UI
+        const renderUI = () => {
+            controls.innerHTML = '';
+            order.forEach(id => {
+                const sec = sections.find(s => s.id === id);
+                if (!sec) return;
 
-            const down = document.createElement('button');
-            down.textContent = '↓';
-            down.onclick = () => {
-                const index = savedOrder.indexOf(id);
-                if (index < savedOrder.length - 1) {
-                    [savedOrder[index], savedOrder[index + 1]] = [savedOrder[index + 1], savedOrder[index]];
-                    storage.set('mainSectionsOrder', savedOrder);
-                    this.applySettings(sections, savedOrder, savedHidden);
-                }
-            };
+                const row = document.createElement('div');
+                row.style.display = 'flex';
+                row.style.alignItems = 'center';
+                row.style.marginBottom = '8px';
 
-            div.appendChild(checkbox);
-            div.appendChild(document.createTextNode(' ' + section.name));
-            div.appendChild(up);
-            div.appendChild(down);
+                const chk = document.createElement('input');
+                chk.type = 'checkbox';
+                chk.checked = !hidden[id];
+                chk.style.marginRight = '6px';
+                chk.onchange = () => {
+                    hidden[id] = !chk.checked;
+                    storage.set('mainSectionsHidden', hidden);
+                    applySettings();
+                };
 
-            controls.appendChild(div);
-        });
+                const label = document.createElement('span');
+                label.textContent = sec.name;
+                label.style.flex = '1';
 
-        this.applySettings(sections, savedOrder, savedHidden);
-    }
+                const btnUp = document.createElement('button');
+                btnUp.textContent = '↑';
+                btnUp.style.marginRight = '4px';
+                btnUp.onclick = () => {
+                    const idx = order.indexOf(id);
+                    if (idx > 0) {
+                        [order[idx], order[idx-1]] = [order[idx-1], order[idx]];
+                        storage.set('mainSectionsOrder', order);
+                        renderUI();
+                        applySettings();
+                    }
+                };
 
-    applySettings(sections, order, hidden) {
-        sections.forEach(sect => {
-            try {
-                window.Lampa.main.setSectionHidden(sect.id, Boolean(hidden[sect.id]));
-                window.Lampa.main.setSectionOrder(sect.id, order.indexOf(sect.id));
-            } catch (e) {
-                console.warn('[MainPageEditor] Невозможно применить настройки для', sect.id);
-            }
-        });
+                const btnDown = document.createElement('button');
+                btnDown.textContent = '↓';
+                btnDown.onclick = () => {
+                    const idx = order.indexOf(id);
+                    if (idx < order.length - 1) {
+                        [order[idx], order[idx+1]] = [order[idx+1], order[idx]];
+                        storage.set('mainSectionsOrder', order);
+                        renderUI();
+                        applySettings();
+                    }
+                };
+
+                row.appendChild(chk);
+                row.appendChild(label);
+                row.appendChild(btnUp);
+                row.appendChild(btnDown);
+
+                controls.appendChild(row);
+            });
+        };
+
+        // Рисуем UI и применяем настройки
+        renderUI();
+        applySettings();
     }
 }
 
-// Регистрация плагина только когда Lampa полностью загружена
+// Регистрируем плагин только когда Lampa полностью загрузилась
 (function waitLampa(){
     if(window.Lampa && window.Lampa.plugins){
         window.Lampa.plugins.register(new MainPageEditorPlugin());
     } else {
-        setTimeout(waitLampa, 100); // повтор через 100 мс
+        setTimeout(waitLampa, 100); // проверка каждые 100мс
     }
 })();

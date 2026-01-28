@@ -1,128 +1,117 @@
-class MainPageEditorPlugin {
-    constructor() {
-        this.id = 'main-page-editor';
-        this.name = 'Main Page Editor';
-        this.version = '1.0.0';
-        this.icon = 'fas fa-th-large';
-    }
+(function(){
 
-    init() {
-        console.log(`[${this.name}] Инициализация...`);
-    }
+    const PLUGIN_ID = 'main_page_editor';
+    const PLUGIN_NAME = 'Main Page Editor';
+    const PLUGIN_VERSION = '1.0';
 
-    ready() {
-        if (!window.Lampa || !window.Lampa.main || !window.Lampa.settings) return;
+    function pluginInit(){
+        if(!window.Lampa || !window.Lampa.plugins) return setTimeout(pluginInit, 100);
+        
+        // Регистрируем плагин
+        window.Lampa.plugins.register({
+            id: PLUGIN_ID,
+            name: PLUGIN_NAME,
+            version: PLUGIN_VERSION,
+            icon: 'fas fa-th-large',
+            default: true,
 
-        const sections = window.Lampa.main.getSections();
-        const storage = window.Lampa.storage;
+            init() {
+                console.log(`[${PLUGIN_NAME}] initialized`);
+            },
 
-        // Создаём раздел настроек, если его ещё нет
-        window.Lampa.settings.add({
-            id: 'main-page-editor',
-            title: 'Main Page Editor',
-            html: '<div id="mpe_container" style="padding:10px;color:#fff;"></div>'
-        });
+            ready() {
+                const main = window.Lampa.main;
 
-        const container = document.getElementById('mpe_container');
-        if (!container) return;
+                if(!main) return console.warn(`[${PLUGIN_NAME}] Lampa.main not found`);
 
-        // Заголовок
-        const panelTitle = document.createElement('h3');
-        panelTitle.textContent = 'Main Page Editor';
-        container.appendChild(panelTitle);
+                const sections = main.getSections();
+                const storage = window.Lampa.storage;
 
-        // Контейнер для контролов
-        const controls = document.createElement('div');
-        controls.id = 'mpe_controls';
-        container.appendChild(controls);
+                // храним порядок и скрытые
+                let savedOrder = storage.get('mpe_order') || sections.map(s=>s.id);
+                let savedHidden = storage.get('mpe_hidden') || {};
 
-        // Загружаем сохранённые настройки
-        let order = storage.get('mainSectionsOrder') || sections.map(s => s.id);
-        let hidden = storage.get('mainSectionsHidden') || {};
-
-        // Функция для применения настроек
-        const applySettings = () => {
-            sections.forEach(sec => {
-                try {
-                    window.Lampa.main.setSectionHidden(sec.id, Boolean(hidden[sec.id]));
-                    window.Lampa.main.setSectionOrder(sec.id, order.indexOf(sec.id));
-                } catch(e) {
-                    console.warn('[MainPageEditor] Не удалось применить настройки для', sec.id);
+                function applySettings(){
+                    sections.forEach(sec => {
+                        try {
+                            main.setSectionHidden(sec.id, Boolean(savedHidden[sec.id]));
+                            main.setSectionOrder(sec.id, savedOrder.indexOf(sec.id));
+                        } catch (e) {}
+                    });
                 }
-            });
-        };
 
-        // Функция для отрисовки UI
-        const renderUI = () => {
-            controls.innerHTML = '';
-            order.forEach(id => {
-                const sec = sections.find(s => s.id === id);
-                if (!sec) return;
+                // Добавляем в меню плагинов
+                window.Lampa.settings.add({
+                    id: PLUGIN_ID,
+                    title: PLUGIN_NAME,
+                    html: `<div id="mpe_root" style="padding:10px;"></div>`
+                });
 
-                const row = document.createElement('div');
-                row.style.display = 'flex';
-                row.style.alignItems = 'center';
-                row.style.marginBottom = '8px';
+                setTimeout(()=>{
+                    const root = document.getElementById('mpe_root');
+                    if(!root) return;
 
-                const chk = document.createElement('input');
-                chk.type = 'checkbox';
-                chk.checked = !hidden[id];
-                chk.style.marginRight = '6px';
-                chk.onchange = () => {
-                    hidden[id] = !chk.checked;
-                    storage.set('mainSectionsHidden', hidden);
+                    savedOrder.forEach(secId => {
+                        const sec = sections.find(s=>s.id === secId);
+                        if(!sec) return;
+
+                        const row = document.createElement('div');
+                        row.style.marginBottom = '8px';
+                        row.style.display = 'flex';
+                        row.style.alignItems = 'center';
+
+                        const chk = document.createElement('input');
+                        chk.type = 'checkbox';
+                        chk.checked = savedHidden[sec.id] !== true;
+                        chk.onchange = () => {
+                            savedHidden[sec.id] = !chk.checked;
+                            storage.set('mpe_hidden', savedHidden);
+                            applySettings();
+                        };
+                        row.appendChild(chk);
+
+                        const label = document.createElement('span');
+                        label.textContent = sec.name;
+                        label.style.flex = '1';
+                        label.style.marginLeft = '6px';
+                        row.appendChild(label);
+
+                        const up = document.createElement('button');
+                        up.textContent = '↑';
+                        up.onclick = () => {
+                            const idx = savedOrder.indexOf(sec.id);
+                            if(idx > 0){
+                                [savedOrder[idx], savedOrder[idx-1]] = [savedOrder[idx-1], savedOrder[idx]];
+                                storage.set('mpe_order', savedOrder);
+                                applySettings();
+                                location.reload();
+                            }
+                        };
+                        row.appendChild(up);
+
+                        const down = document.createElement('button');
+                        down.textContent = '↓';
+                        down.onclick = () => {
+                            const idx = savedOrder.indexOf(sec.id);
+                            if(idx < savedOrder.length - 1){
+                                [savedOrder[idx], savedOrder[idx+1]] = [savedOrder[idx+1], savedOrder[idx]];
+                                storage.set('mpe_order', savedOrder);
+                                applySettings();
+                                location.reload();
+                            }
+                        };
+                        row.appendChild(down);
+
+                        root.appendChild(row);
+                    });
+
                     applySettings();
-                };
+                }, 50);
 
-                const label = document.createElement('span');
-                label.textContent = sec.name;
-                label.style.flex = '1';
-
-                const btnUp = document.createElement('button');
-                btnUp.textContent = '↑';
-                btnUp.style.marginRight = '4px';
-                btnUp.onclick = () => {
-                    const idx = order.indexOf(id);
-                    if (idx > 0) {
-                        [order[idx], order[idx-1]] = [order[idx-1], order[idx]];
-                        storage.set('mainSectionsOrder', order);
-                        renderUI();
-                        applySettings();
-                    }
-                };
-
-                const btnDown = document.createElement('button');
-                btnDown.textContent = '↓';
-                btnDown.onclick = () => {
-                    const idx = order.indexOf(id);
-                    if (idx < order.length - 1) {
-                        [order[idx], order[idx+1]] = [order[idx+1], order[idx]];
-                        storage.set('mainSectionsOrder', order);
-                        renderUI();
-                        applySettings();
-                    }
-                };
-
-                row.appendChild(chk);
-                row.appendChild(label);
-                row.appendChild(btnUp);
-                row.appendChild(btnDown);
-
-                controls.appendChild(row);
-            });
-        };
-
-        // Рисуем UI и применяем настройки
-        renderUI();
-        applySettings();
+            }
+        });
     }
-}
 
-// Регистрируем плагин только когда Lampa полностью загрузилась
-(function waitLampa(){
-    if(window.Lampa && window.Lampa.plugins){
-        window.Lampa.plugins.register(new MainPageEditorPlugin());
-    } else {
-        setTimeout(waitLampa, 100); // проверка каждые 100мс
-    }
+    pluginInit();
+
 })();

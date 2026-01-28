@@ -34,10 +34,7 @@
         };
     }
 
-    function renderSettings() {
-        var container = $(".settings__list");
-        if(!container.length) return;
-
+    function renderSettings(container) {
         var manager = new SectionManager();
         manager.init();
 
@@ -112,12 +109,17 @@
         });
     }
 
-    Lampa.Settings.add({
-        name: "Section Manager",
-        id: "section_manager",
-        html: '<div class="settings__list"></div>',
-        onOpen: renderSettings
-    });
+    // === Новый способ добавления в настройки ===
+    if(Lampa.Settings && Lampa.Settings.create){
+        Lampa.Settings.create({
+            name: "Section Manager",
+            id: "section_manager",
+            html: '<div class="settings__list"></div>',
+            onOpen: function(container){
+                renderSettings(container);
+            }
+        });
+    }
 
     Lampa.Listener.follow("ready", function() {
         applySections();
